@@ -21,6 +21,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.util import dt as dt_util
 from .const import (
     API,
+    CONF_REFRESH_TOKEN,
     DOMAIN,
     RECORD,
     REWIND,
@@ -50,7 +51,7 @@ async def async_setup_entry(
     players = []
     api = hass.data[DOMAIN][entry.entry_id][API]
     for box in api.settop_boxes.values():
-        players.append(LGHorizonMediaPlayer(box, api))
+        players.append(LGHorizonMediaPlayer(box, api, hass, entry))
     async_add_entities(players, True)
 
     platform = entity_platform.async_get_current_platform()
@@ -122,10 +123,12 @@ class LGHorizonMediaPlayer(MediaPlayerEntity):
             "model": self._box.model or "unknown",
         }
 
-    def __init__(self, box: LGHorizonBox, api: LGHorizonApi):
+    def __init__(self, box: LGHorizonBox, api: LGHorizonApi, hass: HomeAssistant, entry: ConfigEntry):
         """Init the media player."""
         self._box = box
         self.api = api
+        self.hass = hass
+        self.entry = entry
         self.box_id = box.deviceId
         self.box_name = box.deviceFriendlyName
         self._create_channel_map()
@@ -141,7 +144,15 @@ class LGHorizonMediaPlayer(MediaPlayerEntity):
         def callback(box_id):
             self.schedule_update_ha_state(True)
 
+        def refresh_callback(refresh_token):
+            if CONF_REFRESH_TOKEN in self.entry.data:
+                _LOGGER.info("New JWT stored (2): %s", refresh_token)
+                new_data = {**self.entry.data}
+                new_data[CONF_REFRESH_TOKEN] = self.api.refresh_token
+                hass.config_entries.async_update_entry(entry, data=new_data)
+
         self._box.set_callback(callback)
+        self.api.set_callback(refresh_callback)
 
     async def async_update(self):
         """Update the box."""
