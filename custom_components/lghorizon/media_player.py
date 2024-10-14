@@ -149,7 +149,7 @@ class LGHorizonMediaPlayer(MediaPlayerEntity):
                 _LOGGER.info("New JWT stored (2): %s", refresh_token)
                 new_data = {**self.entry.data}
                 new_data[CONF_REFRESH_TOKEN] = self.api.refresh_token
-                hass.config_entries.async_update_entry(entry, data=new_data)
+                self.hass.config_entries.async_update_entry(self.entry, data=new_data)
 
         self._box.set_callback(callback)
         self.api.set_callback(refresh_callback)
