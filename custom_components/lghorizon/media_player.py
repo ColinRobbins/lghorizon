@@ -17,7 +17,7 @@ from homeassistant.components.media_player import (
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.util import dt as dt_util
 from .const import (
     API,
@@ -144,15 +144,22 @@ class LGHorizonMediaPlayer(MediaPlayerEntity):
         def callback(box_id):
             self.schedule_update_ha_state(True)
 
-        def refresh_callback(refresh_token):
-            if CONF_REFRESH_TOKEN in self.entry.data:
-                _LOGGER.info("New JWT stored (2): %s", refresh_token)
-                new_data = {**self.entry.data}
-                new_data[CONF_REFRESH_TOKEN] = self.api.refresh_token
-                self.hass.config_entries.async_update_entry(self.entry, data=new_data)
+        def refresh_callback():
+            self.hass.add_job(self._save_refresh_token)
 
         self._box.set_callback(callback)
         self.api.set_callback(refresh_callback)
+
+    @callback
+    def _save_refresh_token(self):
+        """Save the refresh token."""
+        if CONF_REFRESH_TOKEN in self.entry.data:
+            _LOGGER.info("New JWT stored (2): %s", self.api.refresh_token)
+            new_data = {**self.entry.data}
+            new_data[CONF_REFRESH_TOKEN] = self.api.refresh_token
+            self.hass.config_entries.async_update_entry(
+                self.entry, data=new_data
+            )
 
     async def async_update(self):
         """Update the box."""
